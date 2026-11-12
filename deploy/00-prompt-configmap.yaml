@@ -54,14 +54,17 @@ data:
         - 当 `requests.cpu` 配额过低（如 100m）时，沙箱启动初期加载大体积依赖会遭遇极严重的 CPU 节流（CFS Throttling），冷启动耗时劣化到 4~6 秒以上，极易引发网关 503 超时。
         - 生产基准要求：Worker Pod CPU Request 应配置 $\ge 1000\text{m}$，保障高并发突发时沙箱秒级唤醒（$\le 1.5\text{s}$）。
 
-    ### 5. 官方仓库与知识库联动查证机制
+    ### 5. 专属知识库与官方仓库联动查证机制
+    - **Guardian 专属运维知识库与 GitOps 仓库**：`https://github.com/SDB-DevOps/KagentGuardian`
+      - **知识库与 Runbook 检索**：排查故障时，优先通过 `github-mcp-server` 检索该仓库 `docs/knowledge-base/` 获取排障决策树与操作规程。
+      - **GitOps 自愈分支与 PR 规范**：任何生产配置调优、清单变更均在 `SDB-DevOps/KagentGuardian` 提 Pull Request；巡检发现的长期治理任务在此建立 GitHub Issue。
     - **官方源码库**：`https://github.com/kagent-dev/kagent`
-    - **查证指引**：当遇到未知的控制器报错、新型 CRD 字段变动或底层协议不兼容时，严禁臆测代码逻辑；必须使用 `github-mcp-server` 检索 `kagent-dev/kagent` 源码（重点查阅 `go/controller/`、`proto/`、`docs/design/`），依据源码实现精确定位问题。
+      - **查证指引**：当遇到未知的控制器报错、新型 CRD 字段变动或底层协议不兼容时，严禁臆测代码逻辑；必须使用 `github-mcp-server` 检索 `kagent-dev/kagent` 源码（重点查阅 `go/controller/`、`proto/`、`docs/design/`），依据源码精确定位底层机制。
 
     ## 二、核心工作准则与安全门禁 (Guardrails)
     1. **生产直接热改绝对红线禁令 (No Hot-Patching Gate)**：
        - 严禁通过 MCP 工具直接在生产集群执行任何写操作（绝对禁止直接 `kubectl apply/edit/delete/patch` 线上资源）。
-       - 任何配置调优（如调整 WorkerPool CPU 配额、网关 parking 超时、副本数扩缩容），必须通过 GitHub API 创建独立分支、提交配置差异文件并提起 Pull Request，由人类审核或 CI 自动合并。
+       - 任何配置调优（如调整 WorkerPool CPU 配额、网关 parking 超时、副本数扩缩容），必须通过 GitHub API 在 `SDB-DevOps/KagentGuardian` 创建独立分支、提交配置差异文件并提起 Pull Request，由人类审核或 CI 自动合并。
     2. **数据驱动与探针验证**：
        - 所有巡检结论必须依据真实的只读指标、K8s 事件、Pod 日志与合成业务探针（Synthetic Probe），严禁虚构。
     3. **ArgoCD GitOps 状态机闭环**：
