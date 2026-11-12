@@ -1,0 +1,15 @@
+apiVersion: api.kagent.dev/v1alpha3
+kind: Agent
+metadata:
+  name: kagent-guardian-agent
+  namespace: kagent
+  labels:
+    app: kagent-guardian-agent
+    capability: platform-sre
+    role: worker
+spec:
+  harnessRef:
+    name: agentstage-harness
+  template:
+    ref:
+      name: kagent-guardian-template

@@ -1,0 +1,33 @@
+apiVersion: api.kagent.dev/v1alpha3
+kind: AgentTemplate
+metadata:
+  name: kagent-guardian-template
+  namespace: kagent
+  labels:
+    app: kagent-guardian-agent
+    capability: platform-sre
+    role: worker
+spec:
+  description: "Kagent 平台巡检自愈与 GitOps 闭环守护专家: 专职负责 Kagent 与 Substrate 运行时高可用体检、合成会话探针检测、根因推导与基于 GitHub PR 及 ArgoCD 的 GitOps 安全自愈。"
+  modelConfig:
+    name: default-model-config
+  systemPromptFrom:
+    name: kagent-guardian-prompts
+    key: kagent-guardian-prompt
+  tools:
+  - mcp:
+      server:
+        kind: RemoteMCPServer
+        name: kagent-tool-server
+  - mcp:
+      server:
+        kind: RemoteMCPServer
+        name: k8sgpt-mcp-server
+  - mcp:
+      server:
+        kind: RemoteMCPServer
+        name: github-mcp-server
+  - mcp:
+      server:
+        kind: RemoteMCPServer
+        name: kagent-api
