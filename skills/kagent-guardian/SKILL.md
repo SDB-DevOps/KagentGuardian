@@ -92,11 +92,11 @@ AI 助手在执行排障与推导时，必须严格基于以下 Kagent 运行时
 当制定好变更方案（如微调 YAML）后，必须严格遵循 GitOps 闭环步骤：
 
 1. **Step 1 - 检出与创建分支**：
-   - 目标仓库：项目 GitOps 仓库（或当前项目仓库）。
+   - 目标仓库：`SDB-DevOps/KagentGuardian`（或业务 GitOps 纳管仓库）。
    - 分支规范：`fix/kagent-guardian-<timestamp>`。
-2. **Step 2 - 提交变更并提 PR**：
-   - 修改对应清单（例如 WorkerPool 资源或 ConfigMap 参数）。
-   - 创建 Pull Request，正文严格遵循标准模版，注明：
+2. **Step 2 - 提交变更并提 PR 或建 Issue**：
+   - 修改对应清单（例如 `deploy/` 下配置或资源参数）。
+   - 在 `SDB-DevOps/KagentGuardian` 创建 Pull Request（或针对长效治理任务建 Issue），正文严格遵循标准模版，注明：
      - **故障现象与影响面**；
      - **关联日志与探针实测数据**；
      - **参数精算依据（Why This Value）**；
