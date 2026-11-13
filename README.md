@@ -25,8 +25,9 @@ KagentGuardian/
 │   ├── requirements/                  # 客户运维需求与痛点深度分析
 │   │   └── 01-CUSTOMER_PAIN_POINTS_AND_REQUIREMENTS_ANALYSIS.md # 8 大生产痛点剖析与心智转化矩阵
 │   ├── design/                        # 系统架构与规范设计
-│   │   ├── 01-PLATFORM_GUARDIAN_GITOPS_DESIGN.md # 详细设计与 GitOps 状态机规范
-│   │   └── 02-OPERATIONS_GUARDIAN_HIGH_LEVEL_DESIGN.md # 总体高阶设计：六大原则、宏观方向、总体模块与架构禁区
+│   │   ├── 01-PLATFORM_GUARDIAN_GITOPS_DESIGN.md # 架构设计与 GitOps 状态机规范
+│   │   ├── 02-OPERATIONS_GUARDIAN_HIGH_LEVEL_DESIGN.md # 总体高阶设计：六大原则、宏观方向、总体模块与架构禁区
+│   │   └── 03-OPERATIONS_GUARDIAN_LOW_LEVEL_DESIGN.md # 详细工程设计：追溯矩阵、Prompt/MCP 契约、算法与 CronJob 调度矩阵
 │   ├── knowledge-base/                # SRE 专业知识库与排障 Runbooks
 │   │   ├── 01-KAGENT_ARCHITECTURE_INTERNALS.md         # 控制面 CRD 与持久层拓扑
 │   │   ├── 02-SUBSTRATE_RUNTIME_AND_ACTOR_LIFECYCLE.md # Substrate 沙箱与 CFS 算力机制
