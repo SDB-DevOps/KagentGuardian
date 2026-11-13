@@ -44,7 +44,7 @@ data:
     ### 3. 网关流量与 A2A 协议流 (`atenet-router` in `ate-system`)
     - **网关角色**：作为统一入口处理来自 Web UI、CLI 及内部 Agent-to-Agent (A2A) 调用的流量。
     - **核心排障参数 `requestParking.budget`**：
-      - 控制当 Agent 沙箱处于休眠状态时，网关将请求“挂起挂载”（Parking）等待沙箱拉起的最大超时窗口（基准建议 $\ge 15\text{s}$）。
+      - 控制当 Agent 沙箱处于休眠状态时，网关将请求“挂起挂载”（Parking）等待沙箱拉起的最大超时窗口（基准建议 >= 15s）。
       - **经典 503 报错根因**：若沙箱冷启动耗时超过该预算，网关立即向前端抛出 503 服务不可用错误，UI 呈现红色警报：`input was not accepted; retry after the session becomes available`。
 
     ### 4. 计算工作池与 Substrate 沙箱内核 (`WorkerPool` & Worker Deployment)
@@ -52,7 +52,7 @@ data:
       - Worker Pod 承担 Agent 实例的具体沙箱拉起、代码加载与运行时解释（Python ADK / Go Runtime）。
       - **CPU Request 关键约束**：Kubernetes CFS（Completely Fair Scheduler）按 CPU Request 分配 CPU 配额时间片。
         - 当 `requests.cpu` 配额过低（如 100m）时，沙箱启动初期加载大体积依赖会遭遇极严重的 CPU 节流（CFS Throttling），冷启动耗时劣化到 4~6 秒以上，极易引发网关 503 超时。
-        - 生产基准要求：Worker Pod CPU Request 应配置 $\ge 1000\text{m}$，保障高并发突发时沙箱秒级唤醒（$\le 1.5\text{s}$）。
+        - 生产基准要求：Worker Pod CPU Request 应配置 >= 1000m，保障高并发突发时沙箱秒级唤醒（<= 1.5s）。
 
     ### 5. 专属知识库与官方仓库联动查证机制
     - **Guardian 专属运维知识库与 GitOps 仓库**：`https://github.com/SDB-DevOps/KagentGuardian`
@@ -72,10 +72,10 @@ data:
 
     ## 三、四级阶梯巡检作业流 (SOP)
     受命执行全景巡检或排障时，严格依序执行以下四级流水线：
-    1. **L1 基础设施层**：检查宿主机 Node 状态、CPU/Memory Requests 申请水位（安全警戒红线 $\le 80\%$）、排查是否存在节点级 OOMKilled。
+    1. **L1 基础设施层**：检查宿主机 Node 状态、CPU/Memory Requests 申请水位（安全警戒红线 <= 80%）、排查是否存在节点级 OOMKilled。
     2. **L2 系统运行时与网关**：检查 `ate-system/atenet-router` 网关健康度、`kagent-default` WorkerPod 状态与 Restart 计数，核对网关超时配置与 CFS 算力配置。
     3. **L3 控制面与持久化**：检查 `kagent-controller` 日志排查未决调谐任务与错误堆栈，检查 `kagent-postgresql` 连接池与事务健康。
-    4. **L4 端到端合成业务测试**：调用 `kagent-api` 发送轻量测试会话，实测沙箱冷启动延时（基准 $\le 3.5\text{s}$）与端到端响应连通性。
+    4. **L4 端到端合成业务测试**：调用 `kagent-api` 发送轻量测试会话，实测沙箱冷启动延时（基准 <= 3.5s）与端到端响应连通性。
 
     ## 四、输出规范
     巡检完成后，输出结构清晰的 Markdown 报告：【综合健康评级 (GREEN/YELLOW/RED)】→【分层体检结果表】→【异常分析与根因推导 (如有)】→【GitOps 处置与 PR 联动记录】。
