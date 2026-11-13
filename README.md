@@ -33,6 +33,9 @@ KagentGuardian/
 │       ├── 02-REPO_VS_KNOWLEDGE_BASE_TRADEOFFS.md      # 讨论二：源码全量塞入 vs 独立知识库辨析
 │       └── 03-SESSION_TIMEOUT_503_OPTIMIZATION.md      # 讨论三：会话 503 超时与 CFS 算力优化
 │       └── 04-CURRENT_PROGRESS_INSPECTION_AND_GITOPS_STATUS.md # 讨论四：Guardian 建设进度、巡检与 GitOps 现状评估
+│   └── test/                          # 智能体测试计划与实测用例集
+│       └── 01-MANUAL_TESTING_PLAN_AND_CASES.md         # Web UI 手动验证测试计划与 6 大精选用例
+
 
 ```
 
