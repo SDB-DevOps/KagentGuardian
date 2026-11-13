@@ -32,6 +32,8 @@ KagentGuardian/
 │       ├── 01-PROMPT_SEPARATION_AND_UI_INTEGRATION.md  # 讨论一：提示词解耦与 Web UI Prompts 集成
 │       ├── 02-REPO_VS_KNOWLEDGE_BASE_TRADEOFFS.md      # 讨论二：源码全量塞入 vs 独立知识库辨析
 │       └── 03-SESSION_TIMEOUT_503_OPTIMIZATION.md      # 讨论三：会话 503 超时与 CFS 算力优化
+│       └── 04-CURRENT_PROGRESS_INSPECTION_AND_GITOPS_STATUS.md # 讨论四：Guardian 建设进度、巡检与 GitOps 现状评估
+
 ```
 
 ---
