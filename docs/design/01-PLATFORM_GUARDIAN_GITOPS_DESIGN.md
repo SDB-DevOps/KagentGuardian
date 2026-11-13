@@ -1,5 +1,15 @@
 # Kagent 平台巡检自愈与 GitOps 闭环专家智能体 (Platform Guardian) 设计规范
 
+> 📌 **【架构演进与版本继承说明】**
+>
+> 本文档为 Guardian 体系的**初代探索性设计提案（Version 1.0 - Foundation Design）**，率先确立了声明式 GitOps 闭环自愈、三层解耦（AgentTemplate / Prompts / Knowledge Base）与四级阶梯巡检的核心思想。
+>
+> 随着对客户生产环境运维痛点（如会话 503 超时、CFS 截流、告警风暴、PR 并发冲突等）的深入剥离，本方案的核心思想已全面继承、深化并升级为：
+> 1. 《[02-OPERATIONS_GUARDIAN_HIGH_LEVEL_DESIGN.md](./02-OPERATIONS_GUARDIAN_HIGH_LEVEL_DESIGN.md)》（总体高阶设计规范 HLD，确立全景分层与双轨制架构）；
+> 2. 《[03-OPERATIONS_GUARDIAN_LOW_LEVEL_DESIGN.md](./03-OPERATIONS_GUARDIAN_LOW_LEVEL_DESIGN.md)》（详细设计规范 LLD，定义生产级算法公式、双模提示词、双轨 MCP 契约、Lease 分布式自愈锁与 CronJob 调度矩阵）。
+>
+> 本文档完整保留以供团队追溯设计演变脉络。在工程落地与接口对接时，请以 **Doc 02 与 Doc 03 为唯一标准权威依据**。
+
 ## 1. 背景与目标
 
 Kagent 作为一个运行于 Kubernetes 与 Substrate 之上的企业级多智能体协同与沙箱执行平台，其自身的高可用、低延时唤醒与稳定性是支撑上层各类业务 Agent 稳定运行的基础。

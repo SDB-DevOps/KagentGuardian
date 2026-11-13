@@ -72,11 +72,13 @@ graph TB
 ### 2. 双层看门狗架构 (Dual-Watchdog Architecture)
 * **定位**：彻底破除“自己挂了谁来报警”的自监控死循环。
   - **Level 1（平台内专家 In-Platform Guardian）**：常驻 Kagent 平台内部，承担复杂多轮排障、根因分析、PR 生成的重度计算；
-  - **Level 2（集群外哨兵 External Watchdog）**：独立于 Kagent 的超轻量级 Alpine 容器（CronJob / Prometheus Rule），脱离 Kagent 控制面运行。每 60s 对 Gateway 和 Controller 执行纯 HTTP `/healthz` 存活检测。一旦控制面连续 3 次探活超时，哨兵绕过 Kagent 直接向企业 PagerDuty / 钉钉发出控制面死锁告警。
+  - **Level 2（集群外哨兵 External Watchdog）**：独立于 Kagent 的超轻量级 Alpine 容器（CronJob / DaemonSet），脱离 Kagent 控制面运行。每 60s 对 Gateway 和 Controller 执行纯 HTTP `/healthz` 存活检测。检测失败首先向集群 Prometheus Alertmanager 标准 v2 接口投递告警，复用其静默与抑制防风暴机制；连续探活失败且 Alertmanager 不可达时降级直连 Webhook 发出控制面死锁告警。
 
-### 3. 声明式自愈闭环 (Declarative Self-Healing State Machine)
+### 3. 声明式自愈闭环与并发租约 (Declarative Self-Healing & Lease Governance)
 * **定位**：将排障与治理闭环化，从“发现故障”直接打通至“参数调优上线与健康复访”：
-  `健康巡检 -> 瓶颈检测 -> 知识库推导 -> 生成分支与 Diff -> 提交 GitHub PR -> CI/CD 审查合并 -> ArgoCD 调谐 -> 自动执行 L4 探针复访验收`。
+  `健康巡检 -> 瓶颈检测 -> 知识库推导 -> Lease分布式锁抢占 -> PR幂等查重 -> 生成分支与Diff -> 提交GitHub PR -> CI/CD审查合并 -> ArgoCD状态就绪监听 -> 瞬态沙箱复访验收`。
+  - **并发排他保护**：采用 Kubernetes Lease 机制（`kagent-guardian-remediation-lock`），确保多实例定时巡检不发生自愈动作踩踏；
+  - **PR 幂等治理**：若已有开放的自愈 PR，禁止重复开分支，改为追加最新时序指标评论，杜绝 PR 风暴。
 
 ### 4. 全栈阶梯合成探针 (L1-L4 Full-Stack Synthetic Probing)
 * **定位**：告别片面监控，实现四级穿透：
@@ -122,23 +124,26 @@ graph LR
 ### 3. GitOps 治理与 PR 流水线模块 (GitOps PR Pipeline)
 * **核心职责**：将自愈动作收敛在声明式代码流中。
 * **主要功能**：
-  - 调用 `github-mcp-server` 安全拉取主分支代码；
-  - 根据调优算法计算参数（如将沙箱 CPU Limit 从 1000m 调优至 2500m，调高网关 Parking 超时至 45s）；
+  - 调用 `github-mcp-server` 检查当前开放的 PR 列表，实现自愈 PR 幂等去重；
+  - 依赖 Kubernetes Lease 分布式排他锁保护，防止并发巡检导致冲突分支；
+  - 根据滑动窗口双因子算法精算调优参数（如将沙箱 CPU Limit 从 1000m 调优至 2500m，调高网关 Parking 超时至 45s）；
   - 自动创建修复分支（`fix/guardian-tune-...`），提交 YAML 变更 Diff；
-  - 发起 Pull Request，附带 Markdown 格式的完整证据链，等待平台运维人员审核合入。
+  - 发起 Pull Request，附带 Markdown 格式的完整证据链，等待平台运维人员审核合入；
+  - 监听 ArgoCD Application CR 的 `Synced && Healthy` 状态机就绪后，再自动唤醒瞬态验证。
 
 ### 4. 独立轻量哨兵模块 (External Sentinel Sentry)
 * **核心职责**：脱离 Kagent 控制面，作为第二道安全防线。
 * **主要功能**：
   - 极轻量 Alpine 容器常驻集群节点；
   - 周期性对 Kagent Controller 与 Gateway 的 `/healthz` 执行无状态 HTTP 探活；
-  - 连续失败即触发外部直达告警（绕过 Web 控制台与 Guardian Agent）。
+  - 对接企业 Prometheus Alertmanager 标准接口，实施 30s 聚合等待与 12h 重复抑制；
+  - Alertmanager 不可达时降级直接通过 Webhook 报警（绕过 Web 控制台与 Guardian Agent）。
 
-### 5. 心智分级交互与报告模块 (Tiered Reporting & UI Module)
-* **核心职责**：在 Kagent Web 控制台面向不同运维角色进行差异化信息呈现。
+### 5. 自适应心智分级交互与报告模块 (Adaptive Tiered Interaction & UI)
+* **核心职责**：在 Kagent Web 控制台面向不同交互场景与运维角色进行自适应信息呈现。
 * **主要功能**：
-  - 一线（L1）：输出绿黄红状态指示灯与一句话处置指引；
-  - 专家（L2/L3）：出具标准 5 段式完整 RCA 报告（摘要、证据、根因、步骤、风险）；
+  - **日常敏捷问答（Fast Inquiry Mode）**：日常状态咨询输出 3 行精简卡片（指示灯、综合得分、核心依据），秒级响应无冗余；
+  - **专家深度排障（Deep RCA Mode）**：严重故障或巡检报障出具标准 5 段式完整 RCA 报告（摘要、证据、根因、步骤、风险）；
   - 结构化 Markdown 与代码 Diff 语法高亮。
 
 ### 6. SOP 技能编排引擎模块 (Skill Orchestration Engine)
