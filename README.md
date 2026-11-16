@@ -41,7 +41,7 @@ KagentGuardian/
 │       ├── 06-DESIGN_COMPARISON_GAP_ANALYSIS_AND_EVOLUTION.md # 讨论六：Doc 01 与 Doc 03 逐项对比审查、缺陷剖析与演进建议
 │       ├── 07-DESIGN_DOCUMENTATION_REVISION_PLAN_AND_RATIONALE.md # 讨论七：设计文档修编规划与推演过程记录 (逐项整改考量与落地路线图)
 │       ├── 08-GUARDIAN_PRODUCTION_IMPLEMENTATION_PLAN_AND_GAP_ANALYSIS.md # 讨论八：生产落地实施方案 (线上资产对比、增删改清单、依赖拓扑与实施动因)
-│       └── 09-SCHEDULED_INSPECTION_TRIGGER_AND_NOTIFICATION_ARCHITECTURE.md # 讨论九：定期巡检触发机制、告警通知分发链路与现状深度对比分析
+│       └── 09-SCHEDULED_INSPECTION_TRIGGER_AND_NOTIFICATION_ARCHITECTURE.md # 讨论九：定期巡检触发机制、定点通知、GitHub Issue自动建单与PR记录辨析
 │   └── test/                          # 智能体测试计划与实测用例集
 │       ├── 01-MANUAL_TESTING_PLAN_AND_CASES.md         # Web UI 手动验证测试计划与 6 大精选用例
 │       └── 02-AUTOMATED_TEST_EXECUTION_REPORT.md       # 自动化测试执行与质量验收报告 (6/6 全部通过)
@@ -69,22 +69,25 @@ KagentGuardian/
 ## GitOps 闭环状态机
 
 ```text
-[发现配置瓶颈 / 故障亚健康]
+[每日 09:00 / 18:00 定点巡检 触发 Agent]
             │
             ▼
-[自动创建 GitHub 分支 & 提交 Diff]
+[巡检发现指标异常 / 潜在隐患 (健康分 < 90)]
             │
             ▼
-[在 SDB-DevOps/KagentGuardian 提起 Pull Request]
+[自动在 GitHub 创建 Issue 跟踪工单 (幂等查重防刷屏)]
             │
             ▼
-[人类审查 / CI 自动 Merge]
+[判定是否触发自动自愈：抢占排他锁，提 PR (Fixes #Issue)]
+            │
+            ▼
+[人类审查 / CI 自动 Merge PR]
             │
             ▼
 [ArgoCD 驱动集群完成声明式调谐 (Synced & Healthy)]
             │
             ▼
-[Agent 发起 L4 合成探针复测验证 ──> 闭环结单]
+[GitHub 联动自动关闭关联 Issue ──> L4 探针复测结单]
 ```
 
 ---
