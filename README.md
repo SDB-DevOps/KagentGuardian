@@ -90,6 +90,11 @@ KagentGuardian/
 [GitHub 联动自动关闭关联 Issue ──> L4 探针复测结单]
 ```
 
+> 📌 **企业零外部依赖实践（Pure GitHub-Centric Operations）**：针对企业没有钉钉/飞书、且 Slack/Teams 受限无 Webhook 权限的现实场景，系统完全以 GitHub 为单一运营中枢：
+> - **日常绿色巡检**：日终生成签收 PR（`[Daily-Patrol] YYYY-MM-DD Ledger`），SRE 点击 Merge 完成运维日结，合规审计 100% 留痕；
+> - **异常预警与工单**：自动创建 GitHub Issue 并 `@SDB-DevOps/sre-team`，通过 GitHub Mobile App 原生推送与企业邮件秒级直达工程师；
+> - **自愈与变更**：自愈 PR 显式绑定 `Fixes #<Issue-ID>`，审查批准后自动关闭 Issue，无需离开 GitHub 即可完成 SRE 闭环。
+
 ---
 
 ## 协同规约与后续演进
