@@ -40,7 +40,8 @@ KagentGuardian/
 │       ├── 05-CUSTOMER_CENTRIC_REQUIREMENTS_AND_SRE_BLUEPRINT.md # 讨论五：客户运维痛点剥离与全栈 SRE 蓝图 (Prompt/CRD/MCP/Skills)
 │       ├── 06-DESIGN_COMPARISON_GAP_ANALYSIS_AND_EVOLUTION.md # 讨论六：Doc 01 与 Doc 03 逐项对比审查、缺陷剖析与演进建议
 │       ├── 07-DESIGN_DOCUMENTATION_REVISION_PLAN_AND_RATIONALE.md # 讨论七：设计文档修编规划与推演过程记录 (逐项整改考量与落地路线图)
-│       └── 08-GUARDIAN_PRODUCTION_IMPLEMENTATION_PLAN_AND_GAP_ANALYSIS.md # 讨论八：生产落地实施方案 (线上资产对比、增删改清单、依赖拓扑与实施动因)
+│       ├── 08-GUARDIAN_PRODUCTION_IMPLEMENTATION_PLAN_AND_GAP_ANALYSIS.md # 讨论八：生产落地实施方案 (线上资产对比、增删改清单、依赖拓扑与实施动因)
+│       └── 09-SCHEDULED_INSPECTION_TRIGGER_AND_NOTIFICATION_ARCHITECTURE.md # 讨论九：定期巡检触发机制、告警通知分发链路与现状深度对比分析
 │   └── test/                          # 智能体测试计划与实测用例集
 │       ├── 01-MANUAL_TESTING_PLAN_AND_CASES.md         # Web UI 手动验证测试计划与 6 大精选用例
 │       └── 02-AUTOMATED_TEST_EXECUTION_REPORT.md       # 自动化测试执行与质量验收报告 (6/6 全部通过)
