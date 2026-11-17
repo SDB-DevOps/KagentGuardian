@@ -15,18 +15,22 @@ spec:
     name: kagent-guardian-prompts
     key: kagent-guardian-prompt
   tools:
+  # 1. 接入 MCP Proxy 管控的官方全量工具集 (带 PromQL 查询，敏感写/删操作受审批保护)
   - mcp:
       server:
         kind: RemoteMCPServer
-        name: kagent-tool-server
+        name: mcp-proxy-kagent-tool
+  # 2. 接入 MCP Proxy 管控的 K8sGPT 只读诊断
   - mcp:
       server:
         kind: RemoteMCPServer
-        name: k8sgpt-mcp-server
+        name: mcp-proxy-k8sgpt-read
+  # 3. 接入 MCP Proxy 管控的 GitHub 运维工具集 (支持分支/文件/PR创建，敏感 merge 受审批保护)
   - mcp:
       server:
         kind: RemoteMCPServer
-        name: github-mcp-server
+        name: mcp-proxy-github-ops
+  # 4. 集群内 L4 端到端黑盒合成会话探针
   - mcp:
       server:
         kind: RemoteMCPServer
