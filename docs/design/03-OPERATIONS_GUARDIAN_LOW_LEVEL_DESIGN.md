@@ -1,9 +1,9 @@
 # Kagent 巡检运维智能体 (Guardian) 详细设计规范 (Low-Level Design)
 
-> **文档标识**：`DOC-DES-03`  
+> **文档标识**：`DOC-DES-03` (v2.0 企业安全与策略治理修订版)  
 > **所属项目**：Kagent Guardian 平台运维与自愈智能体  
-> **面向对象**：平台核心开发、SRE 工程师、DevOps 实施人员  
-> **设计定位**：本文档为 Kagent Guardian 的详细工程实现规范（Low-Level Design）。文档严格承接《客户需求痛点分析文档》（`DOC-REQ-01`）与《总体高阶设计规范》（`DOC-DES-02`），吸收《架构对比与演进辨析》（`DOC-DIS-06`）与《修编规划推演》（`DOC-DIS-07`）的研究成果，将设计原则细化为**生产级判定算法、双模自适应提示词、双轨制 MCP 工具契约、Lease 自愈并发锁、Alertmanager 哨兵接入与 CronJob 治理调度矩阵**。
+> **面向对象**：平台核心开发、SRE 工程师、DevOps 实施人员、安全审计专家  
+> **设计定位**：本文档为 Kagent Guardian 的详细工程实现规范（Low-Level Design）。文档严格承接《客户需求痛点分析》（`DOC-REQ-01`）与《总体高级设计规范》（`DOC-DES-02` v2.0），全面吸收自《讨论八》至《讨论十三》的最新研究成果，将高阶架构原则细化为**阶梯短路混合执行引擎、AgentStage MCP 网关 PEP 与 HITL 审批流、ParamPolicy 参数白名单、纯 GitHub 日终账本 PR 与 Issue 幂等流转、Lease 自愈并发锁与 CronJob 治理矩阵**。
 
 ---
 
@@ -16,11 +16,14 @@
 | **P-01 (黑盒不可见)** | M1 全景巡检与探针引擎 | `probe-scheduler` + `inspect_platform_health` | L1-L4 阶梯巡检 + 0-100 健康加权算分 + 瞬态生命周期真实 Synthetic 对话探针 |
 | **P-02 (级联链路长)** | M2 根因下钻与关联分析 | `diagnose_agent_failure` + CR 拓扑遍历器 | 逆向提取 Agent->Template->Harness->ModelConfig 依赖树与深层 Events |
 | **P-03 (偶发超时谜)** | M2 根因下钻与关联分析 | `get_cfs_throttling_metrics` | **滑动窗口双因子复合判定**：关联网关 15s Parking 等待、CFS 截流比率与 P99 延时 |
-| **P-04 (MCP 生态碎)** | M1 全景巡检与探针引擎 | 双轨制 MCP 工具箱 (`Macro` + `Micro`) | 宏观全景打分先行；未知异常按需激活微观只读探针（日志下钻/事件过滤），防排障失明 |
+| **P-04 (MCP 生态碎)** | M1 全景巡检与探针引擎 | 统一收敛至 AgentStage Gateway | 废弃直连，收敛至 `mcp-proxy-kagent-tool` 等受控 Tool Groups，消除盲区 |
 | **P-05 (故障归属混)** | M2 根因下钻与关联分析 | `model-gateway-probe` | 独立监测模型供应商 HTTP 429/500，严格区分内部基础设施与外部 LLM |
 | **P-06 (突发并发崩)** | M1 全景巡检与探针引擎 | `capacity-analyzer` (深度体检) | 监控 Substrate 临时沙箱并发峰值与节点 CPU/内存余量，提前容量告警 |
 | **P-07 (临时热改乱)** | M3 GitOps 治理流水线 | `create_gitops_remediation_pr` + **Lease 锁** | 严禁生产热修；**Lease 分布式并发锁 + PR 幂等查重**，防止 PR 泛滥，ArgoCD 状态机闭环 |
 | **P-08 (监控自盲区)** | M4 独立轻量哨兵模块 | `kagent-sentinel-cronjob` + **Alertmanager** | 独立 Alpine 容器脱离 Kagent 控制面，每 60s 探活，接入 Alertmanager 杜绝告警风暴 |
+| **P-09 (Agent越权/未约束参数)** | M7 网关策略与安全管控 | **AgentStage Gateway PEP + ParamPolicy** | 本地 6 步策略校验 + HMAC-SHA256 签名审批单 (HITL) + 约束 owner/repo/namespace 白名单 |
+| **P-10 (无企业IM/外部通知受阻)** | M3 GitOps 治理流水线 | **纯 GitHub 运营闭环体系** | **日终绿色账本 PR（SRE Merge签收）+ 异常 Issue（Title Hash查重+移动端Push）+ Fixes自愈结单** |
+| **P-11 (高频巡检Token开销巨额)** | M1 全景巡检与探针引擎 | **阶梯短路混合执行引擎 (Hybrid Engine)** | 哨兵脚本采集物理基线，仅在异常时短路熔断并唤醒 Agent 深度 RCA，削减 90% Token |
 
 ---
 
@@ -71,6 +74,37 @@ graph TD
   3. 预期接收响应：`"PONG"`；
   4. 度量全链路延时（Round Trip Time, RTT）与首 Token 延迟（Time To First Token, TTFT）；
   5. **强制瞬态回收（Mandatory Cleanup）**：在执行代码的 `finally` 块中立即调用 `kagent-api` 的 `destroy_session` 接口，强行销毁底层 Substrate 沙箱容器，杜绝常驻沙箱占用槽位。
+
+### 2.1.1 阶梯短路机制与混合执行引擎拓扑 (Tiered Short-Circuit & Hybrid Execution)
+
+针对高频巡检（每15分钟一次）大模型 Token 开销巨大的问题，系统采用“轻量脚本快速基线 + 阶梯短路熔断 + 异常时唤醒 Agent 深度 RCA”的混合执行引擎拓扑：
+
+```
+[CronJob 每 15 分钟触发 Sentinel 基线探针 (Shell/Curl 极速执行)]
+                          │
+         ┌────────────────┴────────────────┐
+         ▼                                 ▼
+   [L1 节点/资源检测]                  [异常熔断: 节点宕机/磁盘打满]
+         │ 正常                            │
+         ▼                                 ▼
+   [L2 核心 Pod 与 DB 检测]            [触发短路熔断: 跳过后续 L3/L4]
+         │ 正常                            │
+         ▼                                 │
+   [L3 控制面 CRD 状态检测]                │
+         │ 正常                            │
+         ▼                                 │
+   [L4 端到端合成会话探针]                 │
+         │                                 │
+   ┌─────┴───────────────┐                 │
+   ▼ 正常                ▼ 亚健康/异常     │
+[输出指标账本]      [唤醒 Guardian Agent 深度诊断 (RCA)] <─┘
+   │                     │
+   ▼                     ▼
+[累加至日终PR]      [查重创建 GitHub Issue 告警工单 / 提自愈 PR]
+```
+
+- **短路规则**：若 L1 出现主机宕机或 L2 数据库连接断开，探针判定为底层致命故障，**立即短路熔断，严禁盲目执行 L4 会话探针**（避免产生大量 503 级联垃圾会话）；
+- **Token 节约**：正常无告警时，整个巡检流程完全由 Shell 脚本以毫秒级完成，大模型调用次数为 0；仅当健康分 < 90 或触发短路时，才挂载 MCP 工具唤醒 Agent 进行多步归因分析。
 
 ### 2.2 平台综合健康度评分算法 (Health Scoring Algorithm)
 
@@ -267,6 +301,66 @@ token = http_post(url, headers=headers)["token"]
 - **影响范围**：仅调整 Substrate 工作池沙箱规格，无数据丢失风险。
 - **回滚方案**：若合并后仍有异常，点击下方 'Revert' 即可一键恢复原配额。
 
+### 4.6 日常巡检账本 PR（Daily Patrol Ledger PR）生成与签收规范
+
+为了在无外部 IM 系统的生产环境中满足企业级合规审计与 SRE 日常闭环管理，系统引入**日终账本 PR 机制**：
+
+1. **自动归档节奏**：每天 UTC 23:55，批处理作业汇总过去 24 小时内的所有巡检快照，在 `docs/ledger/` 目录下生成当日账本文件：`docs/ledger/ledger-YYYY-MM-DD.md`；
+2. **分支与 PR 规范**：
+   - 特性分支：`patrol/daily-ledger-YYYY-MM-DD`；
+   - PR 标题：`[Daily-Patrol] YYYY-MM-DD Operations & Health Ledger`；
+   - 标签：`daily-patrol-ledger`、`audit-ready`；
+3. **SRE 签收闭环（Review & Merge as Sign-Off）**：
+   - 每日值班 SRE 登录 GitHub，审阅当天的健康度曲线、L1-L4 探针合格率及告警摘要；
+   - 点击 **Merge Pull Request** 即代表“SRE 专家完成当日平台巡检确认与归档签收”；
+   - Git commit 历史成为永久、不可篡改、符合 SOX/SOC2 审计标准的运维台账。
+
+### 4.7 GitHub Issue 告警工单自动流转与幂等防刷屏算法
+
+当巡检发现严重异常或短路熔断时，系统自动在 GitHub 仓库建立告警工单：
+
+```python
+# GitHub Issue 幂等去重判定伪代码
+def trigger_alert_issue(rule_id, target_resource, severity, evidence_chain):
+    title_hash = hashlib.sha256(f"{rule_id}:{target_resource}".encode()).hexdigest()[:8]
+    issue_title = f"[{severity}] {rule_id}: {target_resource} (Hash: {title_hash})"
+    
+    # 1. 查找是否存在未闭环的相同指纹工单
+    existing_issues = github_search_issues(
+        repo="SDB-DevOps/KagentGuardian",
+        query=f"is:issue is:open in:title {title_hash}"
+    )
+    
+    if existing_issues:
+        # 幂等追加最新时序证据，严禁新建 Issue 刷屏
+        target_issue = existing_issues[0]
+        github_add_comment(
+            issue_number=target_issue["number"],
+            comment=f"**[巡检重现]** 异常仍未消除，最新指标快照：\n{evidence_chain}"
+        )
+        return target_issue["number"]
+    else:
+        # 创建新 Issue 并 @SRE 团队，触发 GitHub 移动端原生 Push
+        body = f"""## 🚨 平台异常告警
+- **规则编号**：`{rule_id}`
+- **目标组件**：`{target_resource}`
+- **严重等级**：`{severity}`
+- **告警时间**：`{datetime.utcnow().isoformat()}`
+- **通知人员**：@SDB-DevOps/sre-team
+
+### 物理证据链条
+{evidence_chain}
+"""
+        new_issue = github_create_issue(
+            title=issue_title,
+            body=body,
+            labels=["incident", f"sev-{severity.lower()}", "guardian-alert"]
+        )
+        return new_issue["number"]
+```
+
+- **自愈 PR 联动结单**：当 Guardian 生成自愈修复 PR 时，在 PR 描述中显式添加关键字 `Fixes #<Issue-Number>`。当 SRE 批准合并自愈 PR 后，GitHub 将自动将该 Issue 标记为 Closed，形成“发现 -> 告警 -> 提修复 -> 合并 -> 自动结单”的端到端无人干预闭环。
+
 ---
 
 ## 五、模块四：双层看门狗与独立轻量哨兵 (Dual-Watchdog & Sentinel)
@@ -379,101 +473,72 @@ CORE OPERATING PRINCIPLES (STRICT & UNBREAKABLE)
 3. READ-ONLY IN PRODUCTION & NO HOT-PATCHING:
    - NEVER execute kubectl apply/patch/delete directly against production clusters.
    - Any infrastructure adjustment or configuration change MUST be submitted via GitHub Pull Requests.
+
+4. AGENTSTAGE MCP GATEWAY & HITL APPROVAL GOVERNANCE:
+   - All tool calls are mediated by the AgentStage Policy Enforcement Point (PEP) Gateway.
+   - If a tool invocation returns `status: PENDING_APPROVAL` with an `approval_id`, the action has been safely intercepted into the governance approval ledger.
+   - Inform the user with the approval ID and portal link (`/governance/approvals`), then poll using `agentstage_approval_result(approval_id=..., wait_seconds=30)`.
+   - Never attempt to bypass or re-issue unapproved mutating tool calls.
 ```
 
 ---
 
-## 七、模块六：双轨制 MCP 工具契约与 Schema 详细定义 (Dual-Track MCP Toolchain)
+## 七、模块六：基于 AgentStage MCP Gateway 的工具治理、Tool Groups 与安全策略契约 (AgentStage Gateway & MCP Toolchain)
 
-系统重构单一黑盒工具设计，建立“宏观领域聚合 + 微观只读探针”的双轨工具矩阵：
+系统彻底摒弃智能体直连裸 MCP Server 的高危架构，将所有外部工具调用收敛至 AgentStage MCP Gateway Policy Enforcement Point (PEP)：
 
 ```mermaid
 graph TD
-    AgentQuery["Guardian 接收排障任务"] --> Macro["轨道一：宏观领域工具 (Macro Track)<br>inspect_platform_health / diagnose_agent_failure"]
-    Macro --> Eval{"已知典型根因？<br>(Confidence >= 0.7)"}
-    Eval -->|是| Result["输出标准归因 / 提自愈 PR"]
-    Eval -->|否 (未知长尾故障)| Micro["轨道二：微观只读探针 (Micro Track)<br>k8s_read_pod_logs / k8s_describe_resource"]
-    Micro --> DeepResult["现场抓取未知堆栈与长尾线索"]
+    Guardian["Kagent Guardian Agent"] --> Gateway["AgentStage MCP Gateway (PEP - Port 3000)<br>本地确定性 6 步策略引擎 + Fail-Closed"]
+    
+    subgraph ToolGroups["Proxy Tool Groups 细粒度工具切片"]
+        TG1["mcp-proxy-kagent-tool<br>官方 127 工具全量 (PromQL 指标 + K8s 诊断)"]
+        TG2["mcp-proxy-github-ops<br>GitHub 代码仓分支管理 / PR / Issue 运维"]
+        TG3["mcp-proxy-k8sgpt-read<br>K8sGPT 只读 AI 事件分析"]
+    end
+    
+    Gateway -->|放行| TG1
+    Gateway -->|放行| TG2
+    Gateway -->|放行| TG3
+    Gateway -->|写/删敏感操作拦截| HITL["PostgreSQL proxy_approvals<br>HMAC-SHA256 签名审批单"]
+    HITL --> WebUI["AgentStage Web UI<br>/governance/approvals (SRE 一键核准)"]
+    WebUI -->|管理员核准| Gateway
 ```
 
-### 7.1 轨道一：宏观领域聚合工具 (Macro Track)
+### 7.1 统一 Tool Groups 拓扑与路由规范
 
-#### 1. 工具：`inspect_platform_health`
+在 `01-agenttemplate.yaml` 中通过 `RemoteMCPServer` 挂载切片工具组：
+
+1. **`mcp-proxy-kagent-tool`**：
+   - 代理地址：`http://agentstage-mcp-gateway.agentstage.svc.cluster.local:3000/sse`（Header: `X-Tool-Group: mcp-proxy-kagent-tool`）；
+   - **核心增益**：原生提供 Discussion 12 中缺失的 Prometheus PromQL 工具（`prometheus_promql_tool`、`prometheus_query_range_tool`），赋予 Agent 秒级拉取 CFS 截流、CPU/内存水位与网关 503 错误率的能力；
+   - 包含工具：K8s 只读诊断（Pod、Node、Events、Logs）与 Prometheus 监控。高危写操作受网关策略拦截。
+2. **`mcp-proxy-github-ops`**：
+   - 代理地址：`http://agentstage-mcp-gateway.agentstage.svc.cluster.local:3000/sse`（Header: `X-Tool-Group: mcp-proxy-github-ops`）；
+   - 包含工具：创建分支、修改文件、发起 PR、创建 Issue 及追加 Comment。敏感分支合并（Merge PR）受网关 HITL 阻断。
+3. **`mcp-proxy-k8sgpt-read`**：
+   - 代理地址：`http://agentstage-mcp-gateway.agentstage.svc.cluster.local:3000/sse`（Header: `X-Tool-Group: mcp-proxy-k8sgpt-read`）；
+   - 包含工具：K8sGPT 权威 AI 只读诊断，用于对 Warning 级别 Event 进行集群侧的先验过滤。
+4. **`kagent-api`**：
+   - 原生集群 Service：`http://kagent-controller.kagent.svc.cluster.local:8080`；
+   - 包含工具：用于 L4 合成探针的会话创建（`create_session`）、问答（`send_message`）与销毁（`destroy_session`）。
+
+### 7.2 核心排障工具契约 (PromQL & K8s)
+
+#### 1. 工具：`prometheus_promql_tool`
 * **输入契约**：
 ```json
 {
   "type": "object",
+  "required": ["query"],
   "properties": {
-    "scope": {
-      "type": "string",
-      "enum": ["all", "l1_infra", "l2_runtime", "l3_controlplane", "l4_synthetic"],
-      "default": "all",
-      "description": "巡检覆盖的层级范围"
-    },
-    "timeout_seconds": { "type": "integer", "default": 30 }
-  }
-}
-```
-* **输出契约**：
-```json
-{
-  "status": "success",
-  "health_score": 88,
-  "health_level": "DEGRADED",
-  "timestamp": "2026-11-13T10:30:00Z",
-  "layers": {
-    "l1_infra": {"status": "HEALTHY", "node_cpu_max": "45%", "memory_max": "62%"},
-    "l2_runtime": {"status": "DEGRADED", "cfs_throttled_ratio_15m": "24.5%", "gateway_p99_latency_s": 9.2, "gateway_503_count_15m": 3},
-    "l3_controlplane": {"status": "HEALTHY", "unready_agents": []},
-    "l4_synthetic": {"status": "HEALTHY", "rtt_ms": 1280}
-  },
-  "issues_detected": [
-    {
-      "severity": "WARNING",
-      "code": "WARN_CFS_DUAL_FACTOR_THROTTLING",
-      "message": "Substrate sandbox container sustained CFS throttling (24.5%) with gateway P99 latency degradation (9.2s)."
-    }
-  ]
-}
-```
-
-#### 2. 工具：`diagnose_agent_failure`
-* **输入契约**：
-```json
-{
-  "type": "object",
-  "required": ["agent_name"],
-  "properties": {
-    "agent_name": { "type": "string", "description": "待排查的 Agent 资源名称" },
-    "namespace": { "type": "string", "default": "kagent", "description": "所在的命名空间" }
+    "query": { "type": "string", "description": "标准 PromQL 查询表达式" },
+    "time": { "type": "string", "description": "评估时间戳（RFC3339 格式，可选）" }
   }
 }
 ```
 
-#### 3. 工具：`create_gitops_remediation_pr`
-* **输入契约（包含 Lease 锁与幂等校验指令）**：
-```json
-{
-  "type": "object",
-  "required": ["repo", "branch_name", "target_file", "patch_diff", "pr_title", "pr_body"],
-  "properties": {
-    "repo": { "type": "string", "example": "SDB-DevOps/KagentGuardian" },
-    "branch_name": { "type": "string", "example": "fix/guardian-tune-cfs-quota" },
-    "target_file": { "type": "string", "example": "deploy/helm/kagent/values.yaml" },
-    "patch_diff": { "type": "string", "description": "统一 diff 格式字符串" },
-    "pr_title": { "type": "string", "description": "PR 标题" },
-    "pr_body": { "type": "string", "description": "标准 Markdown 证据与影响评估" },
-    "check_existing_pr": { "type": "boolean", "default": true, "description": "强制启用 PR 幂等查重，若存在未闭环 PR 则追加评论" },
-    "lease_lock_name": { "type": "string", "default": "kagent-guardian-remediation-lock" }
-  }
-}
-```
-
-### 7.2 轨道二：微观只读排障探针 (Micro Track)
-
-当宏观工具返回 `confidence < 0.7` 或 `classification == UNKNOWN` 时授权调用：
-
-#### 1. 工具：`k8s_read_pod_logs`
+#### 2. 工具：`k8s_read_pod_logs`
 * **输入契约**：
 ```json
 {
@@ -489,31 +554,69 @@ graph TD
 }
 ```
 
-#### 2. 工具：`k8s_describe_resource`
-* **输入契约**：
+### 7.3 网关本地 6 步决策引擎与 HITL 审批交互协议
+
+所有经过 AgentStage Gateway 的请求执行内存级 6 步确定性决策：
+`路径鉴权 (Path Auth) -> 凭据识别 (Identity) -> Tool Group 白名单 -> ParamPolicy 参数检查 -> 审批阻断 (HITL Check) -> 审计记账 (Audit Ledger)`
+
+#### 1. 审批单数据结构 (`proxy_approvals`)
+高危操作（如 `k8s_delete_resource`、`merge_pull_request`、`shell`）被网关直接挂起：
+- **审批流水号**：`approval_id`（如 `appr-8f3e2b1a`）；
+- **防篡改签名**：`HMAC-SHA256(secret_key, approval_id + tool_name + args_hash)`；
+- **状态流转**：`PENDING` -> `APPROVED` / `REJECTED` / `TIMED_OUT`。
+
+#### 2. Agent 遇到拦截时的交互协议
+当网关拦截请求时，返回标准拦截 JSON：
 ```json
 {
-  "type": "object",
-  "required": ["kind", "name", "namespace"],
-  "properties": {
-    "kind": { "type": "string", "enum": ["Pod", "Deployment", "StatefulSet", "Service", "Node", "Agent", "AgentTemplate"] },
-    "name": { "type": "string" },
-    "namespace": { "type": "string", "default": "kagent" }
+  "status": "PENDING_APPROVAL",
+  "approval_id": "appr-8f3e2b1a",
+  "tool_name": "k8s_delete_resource",
+  "message": "Tool execution requires Human-In-The-Loop approval.",
+  "review_url": "http://agentstage.devops.internal/governance/approvals?id=appr-8f3e2b1a"
+}
+```
+
+Guardian 收到拦截响应后：
+1. 向交互控制台提示 SRE：“已拦截高危操作，审批单号 `appr-8f3e2b1a`，请管理员前往控制台核准”；
+2. 调用网关内置轮询工具查询审批结果：
+```json
+{
+  "tool": "agentstage_approval_result",
+  "parameters": {
+    "approval_id": "appr-8f3e2b1a",
+    "wait_seconds": 30
   }
 }
 ```
 
-#### 3. 工具：`k8s_list_abnormal_events`
-* **输入契约**：
-```json
-{
-  "type": "object",
-  "properties": {
-    "namespace": { "type": "string", "default": "kagent" },
-    "since_minutes": { "type": "integer", "default": 15, "maximum": 60 }
-  }
-}
+### 7.4 ParamPolicy 参数强边界收敛配置 (Zero-Trust Hard Boundary)
+
+针对 210 unconstrained resource parameter 漏洞，网关通过 `ParamPolicy` 强制收敛关键参数取值范围：
+
+```yaml
+# AgentStage ParamPolicy 规则配置
+apiVersion: security.agentstage.dev/v1alpha1
+kind: ParamPolicy
+metadata:
+  name: guardian-boundary-policy
+spec:
+  rules:
+    - toolPattern: "github_*"
+      param: "owner"
+      allowedValues: ["SDB-DevOps"]
+      action: "REJECT"
+    - toolPattern: "github_*"
+      param: "repo"
+      allowedValues: ["KagentGuardian", "kagent", "kagent-operator"]
+      action: "REJECT"
+    - toolPattern: "k8s_*"
+      param: "namespace"
+      allowedValues: ["kagent", "substrate", "default", "monitoring"]
+      action: "REJECT"
 ```
+
+通过参数硬隔离，无论模型是否产生幻觉或遭受提示词注入攻击，其物理破坏半径被严格限制在当前组织与指定运维命名空间内。
 
 ---
 
@@ -524,8 +627,9 @@ graph TD
 | 定时任务名称 | 执行载体 | 运行周期 (Cron) | 超时时间 | 核心动作与治理准则 | 资源限制 (Limits) |
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | **外部独立哨兵探活**<br>`sentinel-probe` | K8s CronJob<br>(独立监控命名空间) | **每 60 秒**<br>(`*/1 * * * *`) | 45s | 纯 HTTP GET `/healthz`；失败投递 Alertmanager 收敛；不可达时降级直连 Webhook。 | 0.05 Core / 16MiB |
-| **常规轻量健康探针**<br>`probe-lightweight` | Guardian Agent<br>(内部 Scheduler) | **每 15 分钟**<br>(`*/15 * * * *`) | 30s | 执行 L1-L3 快速扫描与加权健康打分；若亚健康且抢得 Lease 锁则驱动 PR。 | 0.2 Core / 128MiB |
+| **混合阶梯短路基线巡检**<br>`hybrid-baseline-patrol` | Sentinel 轻量容器<br>(Shell+Curl 脚本) | **每 15 分钟**<br>(`*/15 * * * *`) | 30s | L1-L3 毫秒级极速扫描与打分；无异常仅追加日志账本（0 Token）；亚健康或熔断时唤醒 Guardian Agent 深度归因。 | 0.1 Core / 64MiB |
 | **L4 合成对话探针**<br>`probe-synthetic` | Guardian Agent<br>(内部 Scheduler) | **每 60 分钟**<br>(`0 * * * *`) | 60s | 发送 Ping-Pong 对话；**在 finally 块中强制调用 destroy_session 瞬态回收沙箱**。 | 0.5 Core / 256MiB |
+| **日终巡检账本 PR 归档**<br>`daily-ledger-archiver` | K8s CronJob<br>(DevOps 批处理) | **每天 23:55**<br>(`55 23 * * *`) | 120s | 汇总结算当日 96 次巡检快照，生成 `docs/ledger/ledger-YYYY-MM-DD.md`，提交 PR 等待 SRE 点击 Merge 签收。 | 0.2 Core / 128MiB |
 | **探针会话数据生命周期清理**<br>`probe-session-cleanup` | 平台批处理 CronJob | **每天 03:00**<br>(`0 3 * * *`) | 180s | 自动清理 PostgreSQL `session` 表中标签为 `guardian-probe` 且超过 7 天的历史记录，执行 VACUUM。 | 0.2 Core / 128MiB |
 | **深度全景体检与容量分析**<br>`inspection-deep` | Guardian Agent<br>(夜间批处理) | **每天 02:00**<br>(`0 2 * * *`) | 300s | 全量拉取 24 小时 CFS 截流指标、PostgreSQL 慢查询、容量水位趋势与碎片率。 | 1.0 Core / 512MiB |
 | **自愈 PR 回访复测**<br>`post-merge-revisit` | ArgoCD 状态监听器 | **事件驱动状态机**<br>(Synced && Healthy + 30s) | 600s | 轮询探测 ArgoCD 调谐就绪后，再次触发瞬态探针验收自愈成效，超时则报警。 | 0.5 Core / 256MiB |
@@ -534,4 +638,4 @@ graph TD
 
 ## 九、总结与工程落地指引
 
-本详细设计规范（`DOC-DES-03` 修订版）是全栈工程实现的终极权威依据。通过建立**双模自适应交互、双轨制工具链、滑动窗口复合判定、Lease 分布式自愈锁与瞬态沙箱回收**五大机制，Kagent Guardian 真正达成了生产级 SRE 体系的工业稳健性。
+本详细设计规范（`DOC-DES-03` v2.0 修订版）是全栈工程实现的终极权威依据。通过建立**阶梯短路混合执行引擎、AgentStage MCP 网关 PEP 与 HITL 审批流、ParamPolicy 参数白名单、纯 GitHub 日终账本 PR 与 Issue 幂等流转、Lease 分布式自愈锁与瞬态沙箱回收**六大核心机制，Kagent Guardian 真正达成了生产级 SRE 体系的工业稳健性与绝对安全合规。

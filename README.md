@@ -25,9 +25,9 @@ KagentGuardian/
 │   ├── requirements/                  # 客户运维需求与痛点深度分析
 │   │   └── 01-CUSTOMER_PAIN_POINTS_AND_REQUIREMENTS_ANALYSIS.md # 8 大生产痛点剖析与心智转化矩阵
 │   ├── design/                        # 系统架构与规范设计
-│   │   ├── 01-PLATFORM_GUARDIAN_GITOPS_DESIGN.md # 架构设计与 GitOps 状态机规范
-│   │   ├── 02-OPERATIONS_GUARDIAN_HIGH_LEVEL_DESIGN.md # 总体高阶设计：六大原则、宏观方向、总体模块与架构禁区
-│   │   └── 03-OPERATIONS_GUARDIAN_LOW_LEVEL_DESIGN.md # 详细工程设计：追溯矩阵、Prompt/MCP 契约、算法与 CronJob 调度矩阵
+│   │   ├── 01-PLATFORM_GUARDIAN_GITOPS_DESIGN.md # 初始架构探索设计与 GitOps 状态机规范 (v1.0 基石)
+│   │   ├── 02-OPERATIONS_GUARDIAN_HIGH_LEVEL_DESIGN.md # 总体高阶设计规范 (v2.0)：七大原则、六大宏观演进、七大模块与八大架构禁区
+│   │   └── 03-OPERATIONS_GUARDIAN_LOW_LEVEL_DESIGN.md # 详细工程设计规范 (v2.0)：追溯矩阵、混合短路引擎、AgentStage MCP 网关 PEP、HITL 审批流、纯 GitHub 运营闭环与调度矩阵
 │   ├── knowledge-base/                # SRE 专业知识库与排障 Runbooks
 │   │   ├── 01-KAGENT_ARCHITECTURE_INTERNALS.md         # 控制面 CRD 与持久层拓扑
 │   │   ├── 02-SUBSTRATE_RUNTIME_AND_ACTOR_LIFECYCLE.md # Substrate 沙箱与 CFS 算力机制
@@ -60,10 +60,10 @@ KagentGuardian/
 1. **AgentTemplate (声明与装配层)**：
    - 挂载模型配置 (`modelConfig: default-model-config`)。
    - 动态引用 Web UI 提示词库 (`systemPromptFrom: kagent-guardian-prompts`)。
-   - 挂载 4 大 MCP 服务：`kagent-tool-server`（K8s 只读）、`kagent-api`（合成探针）、`k8sgpt-mcp-server`（AI 初筛）、`github-mcp-server`（PR 提交流水线）。
+   - 挂载 4 大受控工具组（通过 AgentStage MCP Gateway PEP 代理）：`mcp-proxy-kagent-tool`（127 工具全量，含 PromQL 指标与 K8s 诊断）、`mcp-proxy-github-ops`（分支/PR/Issue 流水线）、`mcp-proxy-k8sgpt-read`（AI 初筛）、`kagent-api`（瞬态 L4 合成探针）。
 2. **Prompts 页面库 (人设与安全红线层)**：
    - 在 Kagent Web 控制台 `Prompts` 页面集中纳管与在线润色。
-   - 明确常驻 SRE 人设与**生产严禁热改（No Hot-Patching Gate）**的核心铁律。
+   - 明确常驻 SRE 人设与**生产严禁热改（No Hot-Patching Gate）**、**网关 HITL 审批拦截与轮询协议**。
 3. **知识库与 Domain Skill (知识大脑层)**：
    - 沉淀平台内核内幕与四级阶梯巡检流水线（L1 基础资源 -> L2 运行时与网关 -> L3 控制面与持久化 -> L4 端到端合成探针）。
    - 固化故障诊断决策树与标准报告模板。
