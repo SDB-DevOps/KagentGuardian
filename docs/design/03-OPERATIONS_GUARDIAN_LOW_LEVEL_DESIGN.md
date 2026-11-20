@@ -24,6 +24,7 @@
 | **P-09 (Agent越权/未约束参数)** | M7 网关策略与安全管控 | **AgentStage Gateway PEP + ParamPolicy** | 本地 6 步策略校验 + HMAC-SHA256 签名审批单 (HITL) + 约束 owner/repo/namespace 白名单 |
 | **P-10 (无企业IM/外部通知受阻)** | M3 GitOps 治理流水线 | **纯 GitHub 运营闭环体系** | **日终绿色账本 PR（SRE Merge签收）+ 异常 Issue（Title Hash查重+移动端Push）+ Fixes自愈结单** |
 | **P-11 (高频巡检Token开销巨额)** | M1 全景巡检与探针引擎 | **阶梯短路混合执行引擎 (Hybrid Engine)** | 哨兵脚本采集物理基线，仅在异常时短路熔断并唤醒 Agent 深度 RCA，削减 90% Token |
+| **P-12 (多Skill碎片化/证据链截断)** | M6 单一高内聚领域 Skill | **`skills/kagent-guardian/SKILL.md` (v2.0)** | 封装 6 大高内聚子流水线，零元调度时延，物理证据链 100% 贯穿至自愈 PR，Prefix-Cache 友好 |
 
 ---
 
@@ -620,7 +621,59 @@ spec:
 
 ---
 
-## 八、定时任务调度矩阵与生命周期治理 (CronJob & Lifecycle Matrix)
+## 八、模块七：领域专属单一高内聚 Skill 架构与子流水线规范 (Single Cohesive SRE Domain Skill Specification)
+
+### 8.1 架构权衡辨析与单 Skill 胜出逻辑 (Multi-Skill Tradeoff Matrix)
+在 SRE 运维排障闭环中，“巡检 ➔ 归因 ➔ 自愈 ➔ 验收”是不可切分、高度时序相关的连续任务链条。根据《讨论十四》的系统辨析，细粒度多 Skill 拆分方案（将巡检、归因、自愈切为不同 Skill）在生产级实践中存在严重缺陷：
+1. **意图路由震荡与时延开销**：多 Skill 拆分迫使 LLM 进行多次“元调度推理”，在故障抢修黄金期额外增加 10~20 秒时延；
+2. **物理证据链截断（Broken Evidence Chain）**：自愈 PR 必须包含巡检捕获的 PromQL 数据和日志切片作为佐证，跨 Skill 切换会导致上下文被硬性切断，极易引发参数幻觉；
+3. **HITL 审批状态机协同割裂**：写操作被网关拦截为 `PENDING_APPROVAL` 后，跨 Skill 无法连贯调用 `agentstage_approval_result` 轮询并驱动后续 ArgoCD 验证。
+
+因此，Guardian 明确确立**单一高内聚领域 Skill 架构**，在 `skills/kagent-guardian/SKILL.md`（v2.0）内部固化 6 大模块化子流水线，实现零上下文切换与证据链 100% 连贯保真。
+
+### 8.2 `skills/kagent-guardian/SKILL.md` (v2.0) 六大高内聚子流水线拓扑
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│             skills/kagent-guardian/SKILL.md (v2.0) 六大高内聚子流水线   │
+├────────────────────────────────────────────────────────────────────────┤
+│ [Section 0: 安全门禁与网关 PEP 拦截协议] ── 生产严禁直连修改 + HITL 轮询契约│
+│ [Section 1: Kagent 底层拓扑与 MCP 代理映射] ── PromQL 指标与受控 Tool Groups │
+│ [Section 2: 阶梯短路巡检 SOP 与基线打分] ── Sentinel 承接 + L1-L4 穿透门禁 │
+│ [Section 3: 典型故障根因决策树] ── CFS 双因子判定 + 503 网关超时 + 供应商判别│
+│ [Section 4: GitOps 声明式自愈与 HITL 闭环 SOP] ── Lease 锁 + PR + ArgoCD  │
+│ [Section 5: 纯 GitHub 运营报告与双模模板] ── 日终账本 PR + Title Hash Issue│
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Section 0: 安全门禁与网关 PEP 拦截协议 (Safety & HITL Guardrails)**：
+   - 严禁生产热打补丁（No Direct Hot-Patching）；
+   - Fail-Closed 策略：未声明工具默认拒绝；
+   - HITL 审批拦截协议：当收到 `status: PENDING_APPROVAL` 时，提取 `approval_id` 并通知 SRE，退避轮询 `agentstage_approval_result`；
+2. **Section 1: 平台内幕认知与 MCP 代理工具组契约映射 (Platform Knowledge & MCP Mapping)**：
+   - 彻底废除裸 Bash/kubectl，全面映射至 `mcp-proxy-kagent-tool`（含 `prometheus_promql_tool`）、`mcp-proxy-github-ops`、`mcp-proxy-k8sgpt-read` 与 `kagent-api`；
+   - 建立 CFS 算力权重、`atenet-router` 15s budget 与 Substrate 沙箱生命周期的物理常识；
+3. **Section 2: 阶梯短路全景巡检流水线 (Tiered Short-Circuit Patrol SOP)**：
+   - 对接 Sentinel 极速打基线输出：全绿（Score $\ge 85$）直接记账（0 Token），熔断则唤醒 Agent 深度排查；
+   - 严格执行阶段门禁：L1 基础设施未通过时，严禁盲目执行 L4 端到端合成探针；
+4. **Section 3: 典型故障排查根因决策树 (Diagnostic Decision Trees)**：
+   - 滑动窗口双因子 CFS 截流判定算法落地；
+   - 网关 503 超时与 `requestParking.budget` 放宽精算逻辑；
+   - 外部 LLM 服务商 HTTP 429/500 与集群内部计算瓶颈的边界切分；
+5. **Section 4: GitOps 声明式自愈与 HITL 闭环 SOP (GitOps & HITL Remediation SOP)**：
+   - 声明式变更前必须抢占 Kubernetes Lease 锁（10 分钟自动过期）；
+   - 查重当前 Open 的 PR，防止重复提交；
+   - 创建分支 `fix/kagent-guardian-<timestamp>` 并发起 PR，写入物理证据与精算依据；
+   - 调用敏感写工具拦截后，进入有限轮询；批准后监听 ArgoCD `Synced && Healthy`；
+   - 触发瞬态探针验收复测并联动结单；
+6. **Section 5: 纯 GitHub 运营规范与自适应双模输出模板 (GitHub Operations & Dual-Mode Templates)**：
+   - 每日 23:55 生成 `[Daily-Patrol] YYYY-MM-DD Ledger` PR；
+   - 异常 Issue 必须携带 `[ALERT][${Severity}][${Component}] ${Summary} #${TitleHash}` 并在发起前幂等去重；
+   - 交互提示词自适应：敏捷问答输出 3 行 Fast Inquiry 卡片，深度排障输出标准五段式 RCA 报告。
+
+---
+
+## 九、定时任务调度矩阵与生命周期治理 (CronJob & Lifecycle Matrix)
 
 为了在平台稳定性、资源开销与持久层数据健康之间取得最佳平衡，调度矩阵明确如下：
 
@@ -636,6 +689,6 @@ spec:
 
 ---
 
-## 九、总结与工程落地指引
+## 十、总结与工程落地指引
 
-本详细设计规范（`DOC-DES-03` v2.0 修订版）是全栈工程实现的终极权威依据。通过建立**阶梯短路混合执行引擎、AgentStage MCP 网关 PEP 与 HITL 审批流、ParamPolicy 参数白名单、纯 GitHub 日终账本 PR 与 Issue 幂等流转、Lease 分布式自愈锁与瞬态沙箱回收**六大核心机制，Kagent Guardian 真正达成了生产级 SRE 体系的工业稳健性与绝对安全合规。
+本详细设计规范（`DOC-DES-03` v2.0 修订版）是全栈工程实现的终极权威依据。通过建立**阶梯短路混合执行引擎、AgentStage MCP 网关 PEP 与 HITL 审批流、ParamPolicy 参数白名单、纯 GitHub 日终账本 PR 与 Issue 幂等流转、Lease 分布式自愈锁与瞬态沙箱回收、以及领域专属单一高内聚 Skill 架构**七大核心机制，Kagent Guardian 真正达成了生产级 SRE 体系的工业稳健性与绝对安全合规。

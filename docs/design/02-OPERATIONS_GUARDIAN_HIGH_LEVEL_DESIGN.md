@@ -115,6 +115,13 @@ graph TB
   - **异常报警 Issue**：异常指标自动触发建单，Title Hash 幂等查重防刷屏，手机 GitHub App 秒级 Push 推送；
   - **自愈 PR 联动结单**：自愈分支生成 PR 并标注 `Fixes #Issue-ID`，合并后 GitHub 自动关闭关联工单。
 
+### 7. 领域专属单一高内聚 Skill 架构 (Single Cohesive Domain Skill Architecture)
+* **定位**：拒绝过度工程化与多 Skill 碎片化拆分，以单一高内聚、模块化子流水线支撑连续 SRE 闭环。
+  - **连续证据链保障（Zero-Loss Evidence Continuity）**：巡检抓取的 PromQL 曲线与日志物理切片直接作为 RCA 决策树入参并注入自愈 PR 模板，防止跨技能切换造成的证据丢失与参数漂移；
+  - **消除调度意图漂移（Zero Meta-Routing Penalty）**：避免 LLM 在故障抢险期间因“该调用哪个子 Skill”陷入多轮元决策（Meta-Reasoning），直接按内部阶段门禁步进，节约 10~20 秒抢险黄金时间；
+  - **高密度缓存友好（Prefix-Cache Friendly）**：精简为约 2,000 Tokens 的紧凑单一 Skill，在现代大模型 128k+ 窗口中占比不足 1.5%，且长效稳定命中前缀缓存，降低首 Token 延迟；
+  - **云原生极简装配（CRD Atomic Deployment）**：`AgentTemplate` 声明式单一引用，保持系统单一事实源，彻底杜绝多 Skill 挂载时的配置漂移。
+
 ---
 
 ## 三、核心功能模块设计 (High-Level Functional Modules)
@@ -173,12 +180,13 @@ graph LR
   - **专家深度排障（Deep RCA Mode）**：输出标准五段式完整 RCA 报告（摘要、证据链、根因分析、分级处置、风险评估）；
   - 结构化 Markdown 与代码 Diff 语法高亮。
 
-### 6. SOP 技能编排引擎模块 (Skill Orchestration Engine)
-* **核心职责**：解耦复杂多步排障流程，按标准 SOP（Runbook）有序执行。
+### 6. 单一高内聚领域 SOP 技能编排模块 (Single Cohesive Domain Skill Module)
+* **核心职责**：拒绝碎片化多 Skill 拆分，以单一领域专家 Skill（`skills/kagent-guardian/SKILL.md`）承载 SRE 全流程排障与自愈能力。
 * **主要功能**：
-  - 加载领域专属排障技能文件（如 `agent-troubleshooting.skill`）；
-  - 固化阶段门禁（Phase 1 基础检查未过不得盲目执行 Phase 4 合成测试）；
-  - 保证排障步骤标准化、可复现、可审计。
+  - **模块化子流水线（Modular Sub-Pipelines）**：在单一 Skill 内部严谨固化 6 大子阶段（安全门禁 ➔ 架构内幕与 MCP 工具映射 ➔ 阶梯短路巡检 ➔ 经典故障归因树 ➔ GitOps 与 HITL 审批轮询闭环 ➔ 纯 GitHub 运营报告模板）；
+  - **阶段门禁（Phase Gates）**：执行硬性前置依赖约束（如 L1 基础水位未过严禁执行 L4 端到端合成探针；未捕获物理指标严禁发起自愈 PR）；
+  - **证据链原生保真**：避免跨 Skill 切换带来的记忆断层，PromQL 曲线与日志直接透传至 PR Body，杜绝模型幻觉；
+  - **极简 CRD 装配**：`AgentTemplate` 单一挂载 `kagent-guardian`，降低维护成本与配置漂移风险。
 
 ### 7. 网关策略与安全管控模块 (AgentStage Gateway PEP Module)
 * **核心职责**：作为智能体与执行工具之间的集中安全策略执行点（PEP）。
@@ -221,6 +229,9 @@ graph LR
 │                                                                        │
 │ [禁区 8] 严禁无边界调用资源定位参数 (No Unbounded Resource Parameters)  │
 │          必须配置 ParamPolicy 严格限定 owner/repo/namespace 范围       │
+│                                                                        │
+│ [禁区 9] 严禁将连续 SRE 闭环过度拆解为碎片化子技能 (No Sub-Skill Overkill)│
+│          禁止将巡检/归因/自愈拆为多个独立 Skill 造成证据截断与路由漂移 │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -248,12 +259,15 @@ graph LR
 8. **禁区八：严禁无边界调用资源定位参数 (No Unbounded Resource Parameters)**
    * **违规表现**：工具参数允许传入任意 `namespace` 或 `repo`。
    * **危害**：模型产生越权幻觉时可能跨命名空间删除生产业务资源，必须通过 ParamPolicy 锁定白名单。
+9. **禁区九：严禁将连续 SRE 闭环过度拆解为碎片化子技能 (No Fragmented Sub-Skill Over-Engineering)**
+   * **违规表现**：将“巡检发现 ➔ 指标归因 ➔ 自愈 PR ➔ 审批轮询”人为拆散为 3~4 个独立 Skill。
+   * **危害**：引发多轮元调度意图漂移与 10~20 秒无谓时延，跨技能上下文丢失导致自愈 PR 凭空脑补参数，彻底摧毁“证据第一”的严肃审计红线。
 
 ---
 
 ## 五、设计总结与落地指引
 
-本高阶设计规范（`DOC-DES-02` v2.0 修订版）全面吸收了《讨论八》至《讨论十三》的技术结晶：
+本高阶设计规范（`DOC-DES-02` v2.0 修订版）全面吸收了《讨论八》至《讨论十四》的技术结晶：
 
 - **业务上**：以纯 GitHub 运营（Daily Ledger PR + Issue 跟踪）彻底解决客户无外部企业 IM 的推送与合规签收痛点；
 - **架构上**：以混合执行引擎（阶梯短路）降低 90% 巡检 Token 开销，以双层看门狗消除监控自盲区；
