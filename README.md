@@ -45,7 +45,8 @@ KagentGuardian/
 │       ├── 10-INSPECTION_EXECUTION_ENGINE_AGENT_ROLE_AND_TIERED_SHORT_CIRCUIT_LOGIC.md # 讨论十：L1-L4巡检执行内核设计：脚本与Agent角色定位、阶梯依赖拓扑与熔断短路机制
 │       ├── 11-INTERACTIVE_DIAGNOSIS_KNOWLEDGE_FLYWHEEL_AND_SHIFT_LEFT_EVOLUTION.md # 讨论十一：交互式深度排障机制、知识沉淀飞轮与常态巡检左移体系
 │       ├── 12-MCP_TOOLSET_COVERAGE_GAP_ANALYSIS_AND_SAFETY_PERMISSIONS_BOUNDARY.md # 讨论十二：MCP工具集场景覆盖度评估、Agent权限边界与防失误安全控制体系
-│       └── 13-INTEGRATING_AGENTSTAGE_MCP_PROXY_GATEWAY_POLICY_AND_HITL_GOVERNANCE.md # 讨论十三：融入同事研发的 AgentStage MCP Proxy 与 Policy 架构：网关鉴权机制、HITL 审批流与安全融入改造方案
+│       ├── 13-INTEGRATING_AGENTSTAGE_MCP_PROXY_GATEWAY_POLICY_AND_HITL_GOVERNANCE.md # 讨论十三：融入同事研发的 AgentStage MCP Proxy 与 Policy 架构：网关鉴权机制、HITL 审批流与安全融入改造方案
+│       └── 14-SKILL_ARCHITECTURE_EVOLUTION_SINGLE_VS_MULTI_SKILL_TRADEOFFS_AND_REDESIGN.md # 讨论十四：Guardian 领域 Skill 架构演进评估：单一高内聚升级 vs 多 Skill 拆分的技术辨析与重构蓝图
 │   └── test/                          # 智能体测试计划与实测用例集
 │       ├── 01-MANUAL_TESTING_PLAN_AND_CASES.md         # Web UI 手动验证测试计划与 6 大精选用例
 │       └── 02-AUTOMATED_TEST_EXECUTION_REPORT.md       # 自动化测试执行与质量验收报告 (6/6 全部通过)
