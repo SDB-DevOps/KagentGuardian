@@ -18,6 +18,9 @@ KagentGuardian/
 │   ├── 00-prompt-configmap.yaml       # Kagent Web UI 挂载的 Prompts 库 ConfigMap
 │   ├── 01-agenttemplate.yaml          # AgentTemplate 智能体装配规约清单
 │   └── 02-agent.yaml                  # Agent 实例运行清单 (挂载 agentstage-harness)
+├── implement/                         # 生产部署与存量迁移实施方案
+│   ├── README.md                      # 实施方案导引与安全执行守则
+│   └── 01-PRODUCTION_AGENT_DEPLOYMENT_AND_MIGRATION_GUIDE.md # 生产级部署与存量迁移实施指南 (v2.0 落地方案)
 ├── skills/                            # Guardian 专业领域 Skill 规约
 │   └── kagent-guardian/
 │       └── SKILL.md                   # 4 级巡检 SOP、故障决策树与报告模板
