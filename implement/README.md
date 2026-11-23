@@ -9,6 +9,7 @@
 | 文档名称 | 说明 | 适用角色 | 状态 |
 | :--- | :--- | :--- | :--- |
 | **[01-PRODUCTION_AGENT_DEPLOYMENT_AND_MIGRATION_GUIDE.md](./01-PRODUCTION_AGENT_DEPLOYMENT_AND_MIGRATION_GUIDE.md)** | **生产级部署与存量 Agent 迁移升级实施方案**：详细阐明 6 大迁移实施阶段（Phase 0~5）、各阶段前后置门禁、核心注意事项、拓扑依赖图、实操指令、3.5 天工时预估与应急回滚预案。 | SRE 架构师<br>DevOps 工程师<br>平台研发 | **已就绪 (v2.0)** |
+| **[02-PRODUCTION_MIGRATION_EXECUTION_LOG.md](./02-PRODUCTION_MIGRATION_EXECUTION_LOG.md)** | **生产级 Agent 改造实施执行全过程纪要与验收报告**：记录 6 个阶段的实操动作、执行命令、输出日志、Substrate 黄金快照就绪实测、Sentinel 零 Token 巡检验证及日终账本自动提交验收证据。 | SRE 架构师<br>DevOps 工程师<br>审计合规 | **已就绪 (v2.0)** |
 
 ---
 

@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kagent-guardian-session-gc
+  namespace: kagent
+  labels:
+    app.kubernetes.io/name: kagent-guardian-session-gc
+    app.kubernetes.io/part-of: kagent
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 180
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: kagent-guardian-session-gc
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: postgres-gc
+            image: docker.io/library/postgres:18-alpine
+            env:
+            - name: PGHOST
+              value: "kagent-postgresql.kagent.svc.cluster.local"
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              value: "kagent"
+            - name: PGDATABASE
+              value: "agentstage"
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kagent-postgresql
+                  key: POSTGRES_PASSWORD
+            command: ["/bin/sh", "-c"]
+            args:
+            - |
+              set -e
+              echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [SESSION-GC] Starting synthetic probe sessions cleanup (retention: 7 days)..."
+              
+              DELETED=$(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -t -A -c "
+                DELETE FROM session_metadata
+                WHERE (agent_name = 'kagent-guardian-agent' OR title LIKE '%synthetic-probe%')
+                  AND created_at < NOW() - INTERVAL '7 days';
+              ")
+              echo "[SESSION-GC] Cleaned up records: ${DELETED:-0}"
+              echo "[SESSION-GC] Session garbage collection completed successfully."
+            resources:
+              limits:
+                cpu: 200m
+                memory: 128Mi
+              requests:
+                cpu: 50m
+                memory: 64Mi

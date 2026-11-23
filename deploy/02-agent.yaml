@@ -3,6 +3,9 @@ kind: Agent
 metadata:
   name: kagent-guardian-agent
   namespace: kagent
+  annotations:
+    update-ts: "20261123100000"
+    kagent.dev/version: "2.0.0"
   labels:
     app: kagent-guardian-agent
     capability: platform-sre
@@ -13,3 +16,4 @@ spec:
   template:
     ref:
       name: kagent-guardian-template
+

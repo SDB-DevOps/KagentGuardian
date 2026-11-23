@@ -14,16 +14,22 @@
 ```text
 KagentGuardian/
 ├── README.md                          # 仓库全景导览与运维规范
-├── deploy/                            # Kubernetes 生产声明清单
-│   ├── 00-prompt-configmap.yaml       # Kagent Web UI 挂载的 Prompts 库 ConfigMap
-│   ├── 01-agenttemplate.yaml          # AgentTemplate 智能体装配规约清单
-│   └── 02-agent.yaml                  # Agent 实例运行清单 (挂载 agentstage-harness)
+├── deploy/                            # Kubernetes 生产声明清单与自动化套件
+│   ├── 00-prompt-configmap.yaml       # Kagent Web UI 挂载的 Prompts 库 ConfigMap (v2.0 SRE & PEP HITL)
+│   ├── 01-agenttemplate.yaml          # AgentTemplate 智能体装配规约清单 (接入 3 大 MCP Gateway 代理)
+│   ├── 02-agent.yaml                  # Agent 实例运行清单 (挂载 agentstage-harness)
+│   └── guardian/                      # 守护者生产运维自动化套件
+│       ├── lease-rbac.yaml            # 分布式排他锁 Lease 与细粒度 RBAC 权限
+│       ├── sentinel-cronjob.yaml      # 外部轻量哨兵 (每 15 分钟，零 Token 打分)
+│       ├── session-gc-cronjob.yaml    # PostgreSQL 会话历史数据定期清理 CronJob
+│       └── ledger-cronjob.yaml        # 日终 GitHub 账本自动提交归档 CronJob
 ├── implement/                         # 生产部署与存量迁移实施方案
 │   ├── README.md                      # 实施方案导引与安全执行守则
-│   └── 01-PRODUCTION_AGENT_DEPLOYMENT_AND_MIGRATION_GUIDE.md # 生产级部署与存量迁移实施指南 (v2.0 落地方案)
+│   ├── 01-PRODUCTION_AGENT_DEPLOYMENT_AND_MIGRATION_GUIDE.md # 生产级部署与存量迁移实施指南 (v2.0 DOC-IMP-01)
+│   └── 02-PRODUCTION_MIGRATION_EXECUTION_LOG.md              # 改造实施过程纪要与验收报告 (v2.0 DOC-IMP-02)
 ├── skills/                            # Guardian 专业领域 Skill 规约
 │   └── kagent-guardian/
-│       └── SKILL.md                   # 4 级巡检 SOP、故障决策树与报告模板
+│       └── SKILL.md                   # 六大流水线 SOP、CFS 双因子决策树与自适应报告模版 (v2.0)
 ├── docs/
 │   ├── requirements/                  # 客户运维需求与痛点深度分析
 │   │   └── 01-CUSTOMER_PAIN_POINTS_AND_REQUIREMENTS_ANALYSIS.md # 8 大生产痛点剖析与心智转化矩阵

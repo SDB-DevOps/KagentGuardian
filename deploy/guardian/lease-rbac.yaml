@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kagent-guardian-sa
+  namespace: kagent
+  labels:
+    app.kubernetes.io/name: kagent-guardian
+    app.kubernetes.io/part-of: kagent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kagent-guardian-lease-role
+  namespace: kagent
+  labels:
+    app.kubernetes.io/name: kagent-guardian
+    app.kubernetes.io/part-of: kagent
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "events", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kagent-guardian-lease-binding
+  namespace: kagent
+  labels:
+    app.kubernetes.io/name: kagent-guardian
+    app.kubernetes.io/part-of: kagent
+subjects:
+- kind: ServiceAccount
+  name: kagent-guardian-sa
+  namespace: kagent
+- kind: ServiceAccount
+  name: kagent-default
+  namespace: kagent
+roleRef:
+  kind: Role
+  name: kagent-guardian-lease-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kagent-guardian-cluster-reader
+  labels:
+    app.kubernetes.io/name: kagent-guardian
+    app.kubernetes.io/part-of: kagent
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kagent-guardian-cluster-reader-binding
+  labels:
+    app.kubernetes.io/name: kagent-guardian
+    app.kubernetes.io/part-of: kagent
+subjects:
+- kind: ServiceAccount
+  name: kagent-guardian-sa
+  namespace: kagent
+roleRef:
+  kind: ClusterRole
+  name: kagent-guardian-cluster-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: coordination.k8s.io/v1
+kind: Lease
+metadata:
+  name: kagent-guardian-lock
+  namespace: kagent
+  labels:
+    app.kubernetes.io/name: kagent-guardian
+    app.kubernetes.io/part-of: kagent
+spec:
+  holderIdentity: null
+  leaseDurationSeconds: 600
+

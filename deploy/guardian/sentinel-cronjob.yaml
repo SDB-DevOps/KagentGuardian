@@ -1,0 +1,72 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kagent-guardian-sentinel
+  namespace: kagent
+  labels:
+    app.kubernetes.io/name: kagent-guardian-sentinel
+    app.kubernetes.io/part-of: kagent
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 120
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: kagent-guardian-sentinel
+        spec:
+          serviceAccountName: kagent-guardian-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: sentinel
+            image: bitnami/kubectl:latest
+            command: ["/bin/sh", "-c"]
+            args:
+            - |
+              set -e
+              echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [SENTINEL] Starting L1-L3 Tiered Short-Circuit Baseline Patrol..."
+              
+              SCORE=100
+              ISSUES=""
+              
+              # 1. L1 Node Health Check
+              NOT_READY_NODES=$(kubectl get nodes --no-headers | grep -v ' Ready' | wc -l || true)
+              if [ "$NOT_READY_NODES" -gt 0 ]; then
+                SCORE=$((SCORE - 30))
+                ISSUES="${ISSUES}[L1] ${NOT_READY_NODES} node(s) NotReady; "
+              fi
+              
+              # 2. L2 Pod Restarts & CrashLoopBackOff in kagent & ate-system
+              CRASH_PODS=$(kubectl get pods -n kagent --no-headers 2>/dev/null | grep -E 'CrashLoopBackOff|Error|OOMKilled' | wc -l || true)
+              if [ "$CRASH_PODS" -gt 0 ]; then
+                SCORE=$((SCORE - 25))
+                ISSUES="${ISSUES}[L2] ${CRASH_PODS} core pod(s) crashing/failing; "
+              fi
+              
+              # 3. L3 Controller & PostgreSQL check
+              PG_READY=$(kubectl get pods -n kagent -l app=kagent-postgresql --no-headers | grep -E '1/1|Running' | wc -l || true)
+              if [ "$PG_READY" -eq 0 ]; then
+                SCORE=$((SCORE - 35))
+                ISSUES="${ISSUES}[L3] PostgreSQL pod not ready; "
+              fi
+              
+              echo "[SENTINEL] Health Baseline Score: ${SCORE}/100"
+              if [ "$SCORE" -ge 85 ]; then
+                echo "[SENTINEL] STATUS: GREEN (Healthy). Zero Token consumed. Direct ledger snapshot logged."
+                exit 0
+              else
+                echo "[SENTINEL] STATUS: CIRCUIT_BREAKER_TRIGGERED (Score: ${SCORE}). Issues: ${ISSUES}"
+                echo "[SENTINEL] Escalating to Kagent Guardian Agent for deep root-cause diagnosis..."
+                exit 1
+              fi
+            resources:
+              limits:
+                cpu: 200m
+                memory: 128Mi
+              requests:
+                cpu: 50m
+                memory: 64Mi
