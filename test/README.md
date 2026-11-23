@@ -16,6 +16,7 @@
 | 文档名称 | 核心内容与目的 | 适用阶段 | 状态 |
 | :--- | :--- | :---: | :---: |
 | **[01-PRODUCTION_VERIFICATION_TEST_PLAN.md](./01-PRODUCTION_VERIFICATION_TEST_PLAN.md)** | **生产级全量验收测试计划与设计预实验证方案**：涵盖 10 大核心测试用例（`TC-V2-01` ~ `TC-V2-10`），全量覆盖 No Hot-Patching 拦截、网关 PEP HITL 轮询、零 Token 哨兵短路、CFS 双因子诊断、GitOps 闭环、Lease 并发排他锁、日终账本自动归档、Session GC 清理及 Substrate 黄金快照验证。 | 生产验收 / 巡检审计 | **已发布 (v2.0)** |
+| **[02-COMPREHENSIVE_TEST_CASES_SPECIFICATION.md](./02-COMPREHENSIVE_TEST_CASES_SPECIFICATION.md)** | **生产级全量测试用例详细设计规约 (功能/安全/边界/容错/性能)**：涵盖 5 大测试领域、28 个细分实测用例，包含深度提示词注入攻防、84/85 分与 299/300 秒极限临界测试、断网与时钟漂移混沌演练、以及 FinOps Token 成本核算审计。 | 深度测试 / 自动化执行 / 准出核签 | **已发布 (v2.0)** |
 
 ---
 

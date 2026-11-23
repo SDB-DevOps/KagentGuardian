@@ -32,7 +32,8 @@ KagentGuardian/
 │       └── SKILL.md                   # 六大流水线 SOP、CFS 双因子决策树与自适应报告模版 (v2.0)
 ├── test/                              # 生产级验收测试中心 (Test Center)
 │   ├── README.md                      # 测试中心概览与覆盖矩阵
-│   └── 01-PRODUCTION_VERIFICATION_TEST_PLAN.md # 生产级全量验收测试计划与设计预实验证方案 (v2.0)
+│   ├── 01-PRODUCTION_VERIFICATION_TEST_PLAN.md # 生产级全量验收测试计划与设计预实验证方案 (v2.0)
+│   └── 02-COMPREHENSIVE_TEST_CASES_SPECIFICATION.md # 全量测试用例详细设计规约 (功能/安全/边界/容错/性能) (v2.0)
 ├── docs/
 │   ├── requirements/                  # 客户运维需求与痛点深度分析
 │   │   └── 01-CUSTOMER_PAIN_POINTS_AND_REQUIREMENTS_ANALYSIS.md # 8 大生产痛点剖析与心智转化矩阵
