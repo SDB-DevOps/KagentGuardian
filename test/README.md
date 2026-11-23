@@ -17,6 +17,7 @@
 | :--- | :--- | :---: | :---: |
 | **[01-PRODUCTION_VERIFICATION_TEST_PLAN.md](./01-PRODUCTION_VERIFICATION_TEST_PLAN.md)** | **生产级全量验收测试计划与设计预实验证方案**：涵盖 10 大核心测试用例（`TC-V2-01` ~ `TC-V2-10`），全量覆盖 No Hot-Patching 拦截、网关 PEP HITL 轮询、零 Token 哨兵短路、CFS 双因子诊断、GitOps 闭环、Lease 并发排他锁、日终账本自动归档、Session GC 清理及 Substrate 黄金快照验证。 | 生产验收 / 巡检审计 | **已发布 (v2.0)** |
 | **[02-COMPREHENSIVE_TEST_CASES_SPECIFICATION.md](./02-COMPREHENSIVE_TEST_CASES_SPECIFICATION.md)** | **生产级全量测试用例详细设计规约 (功能/安全/边界/容错/性能)**：涵盖 5 大测试领域、28 个细分实测用例，包含深度提示词注入攻防、84/85 分与 299/300 秒极限临界测试、断网与时钟漂移混沌演练、以及 FinOps Token 成本核算审计。 | 深度测试 / 自动化执行 / 准出核签 | **已发布 (v2.0)** |
+| **[03-MANUAL_UI_INTERACTION_TEST_CASES.md](./03-MANUAL_UI_INTERACTION_TEST_CASES.md)** | **网页端交互式手动测试用例集 (Manual UI Test Cases)**：涵盖 5 大分类、21 个可直接在 Web UI 复制粘贴的实战用例。覆盖 L1-L4 全链路与分层阶梯巡检、四元组 MCP 工具调用、生产环境零热修安全防御、越狱与注入攻防、以及 GitOps 自愈闭环。 | Web 控制台手动实操 / 巡检 / 权限审计 | **已发布 (v2.0)** |
 
 ---
 
